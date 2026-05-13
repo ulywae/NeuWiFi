@@ -1,0 +1,79 @@
+#######################################
+# NeuWiFi - Syntax Highlighting
+#######################################
+
+NeuWiFi	KEYWORD1
+NeuHttpServer	KEYWORD1
+NeuHttpClient	KEYWORD1
+NeuUDP	KEYWORD1
+NeuDnsServer	KEYWORD1
+
+# =========================
+# Core WiFi Methods
+# =========================
+init	KEYWORD2
+begin	KEYWORD2
+start	KEYWORD2
+stop	KEYWORD2
+startSTA	KEYWORD2
+startAP	KEYWORD2
+startHybrid	KEYWORD2
+setHostname	KEYWORD2
+getSTAIP	KEYWORD2
+getAPIP	KEYWORD2
+startScan	KEYWORD2
+getScanResults	KEYWORD2
+
+# =========================
+# HTTP Server
+# =========================
+on	KEYWORD2
+onWS	KEYWORD2
+init	KEYWORD2
+sendText	KEYWORD2
+sendJSON	KEYWORD2
+redirect	KEYWORD2
+getPostParam	KEYWORD2
+
+# =========================
+# WebSocket
+# =========================
+wsSendText	KEYWORD2
+wsSendBin	KEYWORD2
+wsSendPing	KEYWORD2
+wsBroadcast	KEYWORD2
+wsSendToFd	KEYWORD2
+
+WS_EVENT_CONNECT	LITERAL1
+WS_EVENT_DISCONNECT	LITERAL1
+WS_EVENT_TEXT	LITERAL1
+WS_EVENT_BINARY	LITERAL1
+WS_EVENT_PING	LITERAL1
+WS_EVENT_PONG	LITERAL1
+WS_EVENT_ERROR	LITERAL1
+
+WS_EVENT_*	LITERAL1
+HTTP_GET	LITERAL1
+HTTP_POST	LITERAL1
+
+# =========================
+# UDP
+# =========================
+begin	KEYWORD2
+send	KEYWORD2
+stop	KEYWORD2
+setBroadcast	KEYWORD2
+joinMulticast	KEYWORD2
+setCallback	KEYWORD2
+
+# =========================
+# DNS Server
+# =========================
+start	KEYWORD2
+stop	KEYWORD2
+
+# =========================
+# HTTP Client
+# =========================
+get	KEYWORD2
+post	KEYWORD2

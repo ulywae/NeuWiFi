@@ -1,0 +1,21 @@
+{
+  "name": "NeuWiFi",
+  "version": "1.0.0",
+  "description": "Professional & Beginner-friendly networking suite for ESP32 (WiFi, Async WebServer, DNS).",
+  "keywords": "esp32, wifi, http, server, websocket, dns, captive-portal, esp-idf",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ulywae/NeuWiFi"
+  },
+  "authors": [
+    {
+      "name": "Ulywae (@Neufa)",
+      "maintainer": true
+    }
+  ],
+  "frameworks": "espidf, arduino",
+  "platforms": "espressif32",
+  "build": {
+    "flags": "-I src"
+  }
+}
