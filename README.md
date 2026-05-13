@@ -497,10 +497,10 @@ NeuWiFiConfig.h
 | `NEU_SERVER_WS_BUF_SIZE`   | 256     | Buffer size for incoming WebSocket frames.            |
 | `NEU_DNS_BUFFER_SIZE`      | 512     | UDP buffer size for DNS captive portal responses.     |
 
-> These values are optimized for ESP32 RAM stability and FreeRTOS stack safety.
->
 > [!IMPORTANT]
 > Always define compile-time macros **before including `NeuWiFi.h`** to ensure correct module compilation and memory allocation.
+>
+> These values are optimized for ESP32 RAM stability and FreeRTOS stack safety.
 
 ---
 
