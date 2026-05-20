@@ -8,54 +8,66 @@
 
 Professional ESP32 Networking Toolkit for ESP-IDF
 
-**NeuWiFi** is a lightweight, event-driven networking toolkit designed specifically for ESP32 systems.
-It focuses on deterministic runtime behavior, bounded memory usage, modular architecture, and practical embedded networking.
+**NeuWiFi** is a complete networking ecosystem designed exclusively for the ESP32 family, compatible with both Arduino Core and native ESP-IDF environments. It combines high-performance execution with an ultra-lean memory footprint, providing everything you need to build robust IoT applications — from basic connectivity to advanced web services and device discovery.
 
-Unlike many high-level wrappers, NeuWiFi is intentionally designed around:
-
-- predictable runtime behavior
-- low idle overhead
-- defensive resource handling
-- event-driven architecture
-- modular subsystem usage
-- real-world embedded deployment
+Unlike generic libraries that simply wrap low-level APIs, NeuWiFi is built around a **centralized state architecture**, ensuring all modules work in perfect synchronization. It prioritizes deterministic behavior, defensive resource management, and minimal overhead, making it suitable for both hobbyist projects and embedded systems.
 
 ---
 
 # Features
 
-## Core WiFi
+NeuWiFi packs a full suite of networking capabilities into one cohesive framework:
 
-- STA (Station) mode
-- SoftAP mode
-- Hybrid AP+STA mode
-- Static IP support
-- DNS configuration
-- Hostname configuration
-- Auto reconnect
-- WiFi scan API
-- Runtime event callbacks
-- TX power control
-- Security threshold control
+## Core WiFi Engine
 
-## HTTP Server
+- **STA (Station)**, **SoftAP**, and **Hybrid (AP+STA)** concurrent operation
+- Static IP configuration with validation & LwIP endianness correction via `IPConfig`
+- DHCP support, custom Hostname setting, TX Power control, and security policy management
+- Smart **Auto-Reconnect** logic with failure detection
+- Non-blocking WiFi Scan API with detailed result parsing
+- Complete **Event-Driven** callback system for state changes
+- Automatic status synchronization to the global `SharedState` manager
 
-- Lightweight HTTP server
-- Static route support
-- Dynamic route handlers
-- JSON helpers
-- Redirect helpers
-- POST parameter parser
-- Custom error handlers
+## Centralized State Management
 
-## WebSocket
+> _The heart of the NeuWiFi architecture_
 
-- Built-in WebSocket support
-- Async frame handling
-- Broadcast support
-- Ping/Pong support
-- Binary frame support
-- Client FD management
+- Unified system awareness: All modules (UDP, DNS, HTTP, mDNS) share the same operational state
+- Intelligent service lifecycle: Services automatically start/stop when the network comes up or goes down
+- **Client Tracking System**: Differentiates "new" vs "authenticated" users — essential for captive portals
+- Thread-safe operations with atomic flags and event groups
+- Deterministic behavior with zero hidden logic
+
+## UDP Transport Layer
+
+- Lightweight, high-speed socket implementation
+- Full support for Unicast, Broadcast, and Multicast communication
+- Runs asynchronously in a dedicated FreeRTOS task — independent of the main loop
+- Configurable blocking mode, receive timeout, and task stack size
+- Dual callback system: Simple payload handler or raw `sockaddr_in` access for advanced use cases
+
+## HTTP Server & WebSocket
+
+- Asynchronous web server built directly on ESP-IDF HTTP Server APIs
+- Static content routes, dynamic URI handlers, JSON helpers, and redirect utilities
+- POST parameter parser and custom error page handlers
+- **Full WebSocket Support**: Persistent connections, text/binary frames, broadcast messaging, and Ping/Pong
+- Client management: Get active connections, close clients, or send data directly to specific file descriptors
+
+## DNS Server — Captive Portal Engine
+
+- Port 53 DNS responder built on NeuUDP
+- Intelligent response logic: Redirects only unauthenticated clients using data from `SharedState`
+- Resolves all domains to device IP — perfect for Wi-Fi onboarding portals
+- Extremely low memory footprint and high performance
+
+## mDNS Service Discovery
+
+- Native Multicast DNS implementation to avoid system conflicts
+- Hostname advertisement (e.g., `device.local`)
+- Service publishing with custom **TXT Records** for metadata
+- Discovery mode: Scan the local network for other NeuWiFi or mDNS-enabled devices
+- Structured key-value storage with fixed-size safety buffers
 
 ## HTTP Client
 
@@ -66,20 +78,12 @@ Unlike many high-level wrappers, NeuWiFi is intentionally designed around:
 - Buffered response handling
 - Internal response streaming
 
-## UDP
+## Utility: IP Configuration
 
-- Async UDP listener
-- Broadcast support
-- Multicast support
-- Callback-driven packet handling
-- Dedicated FreeRTOS receive task
-
-## DNS Server
-
-- Captive portal DNS server
-- Dynamic AP IP response
-- Lightweight UDP implementation
-- Minimal memory footprint
+- Safe storage class for IPv4 addresses, gateways, and DNS
+- Automatic conversion between string format and raw LwIP `ip_addr_t`
+- Built-in validation to prevent invalid network configurations
+- Used consistently across all modules for type safety
 
 ---
 
@@ -169,21 +173,20 @@ lib_deps = ulywae/NeuWiFi
 ## Basic STA Connection
 
 ```cpp
-#include "NeuWiFi.h"
+#include <NeuWiFi.h>
 
-NeuWiFi wifi;
+void setup() {
+    Serial.begin(115200);
 
-void setup()
-{
-    wifi.begin();
+    NeuWiFi.begin();
+    NeuWiFi.startSTA("MY_HOME_SSID", "MY_PASSWORD");
 
-    bool ok = wifi.startSTA("MyWiFi", "12345678");
-
-    if(ok)
-    {
-        printf("Connected: %s\n", wifi.getSTAIP());
+    if (NeuWiFi.isConnected()) {
+        Serial.printf("Connected! IP: %s\n", NeuWiFi.getSTAIP());
     }
 }
+
+void loop() {}
 ```
 
 ---
@@ -191,14 +194,12 @@ void setup()
 ## SoftAP Example
 
 ```cpp
-#include "NeuWiFi.h"
-
-NeuWiFi wifi;
+#include <NeuWiFi.h>
 
 void setup()
 {
-    wifi.begin();
-    wifi.startAP("Neu-AP", "12345678");
+    NeuWiFi.begin();
+    NeuWiFi.startAP("Neu-AP", "12345678");
 }
 ```
 
@@ -207,15 +208,13 @@ void setup()
 ## Hybrid AP + STA Example
 
 ```cpp
-#include "NeuWiFi.h"
-
-NeuWiFi wifi;
+#include <NeuWiFi.h>
 
 void setup()
 {
-    wifi.begin();
+    NeuWiFi.begin();
 
-    wifi.startHybrid(
+    NeuWiFi.startHybrid(
         "HomeWiFi",
         "12345678",
         "NeuHybrid",
@@ -270,19 +269,24 @@ void setup()
 # UDP Example
 
 ```cpp
-#include "NeuUDP.h"
+#define USE_NEU_UDP
+#include <NeuWiFi.h>
 
 NeuUDP udp;
 
-void setup()
-{
-    udp.begin(5000);
-
-    udp.setCallback([](uint8_t *data, size_t len, const char *ip, uint16_t port)
-    {
-        printf("Packet from %s:%d\n", ip, port);
-    });
+void onPacket(const uint8_t *data, size_t len, const char *ip, uint16_t port, void *user) {
+    Serial.printf("Received %d bytes from %s:%d\n", len, ip, port);
 }
+
+void setup() {
+    NeuWiFi.begin();
+    NeuWiFi.startSTA("MY_HOME_SSID", "MY_PASSWORD");
+
+    udp.begin(5000);
+    udp.onPacket(onPacket);
+}
+
+void loop() {}
 ```
 
 ---
@@ -290,7 +294,8 @@ void setup()
 # HTTP Client Example
 
 ```cpp
-#include "NeuHttpClient.h"
+#define USE_NEU_HTTP_CLIENT
+#include <NeuWiFi.h>
 
 char response[512];
 
@@ -310,6 +315,33 @@ void setup()
 
 ---
 
+# Access Point + DNS Captive Portal
+
+```cpp
+#define USE_NEU_DNS_SERVER
+#define USE_NEU_HTTP_SERVER
+#include <NeuWiFi.h>
+
+NeuHttpServer server;
+NeuDNSServer dnsServer;
+
+void setup() {
+    NeuWiFi.begin();
+    NeuWiFi.startAP("NeuWiFi-Setup", "12345678");
+
+    // Start Web Server
+    server.begin(80);
+    server.on("/", "<h1>Welcome! Device Ready.</h1>");
+
+    // Start DNS Server (Redirect all domains to AP IP)
+    dnsServer.begin();
+}
+
+void loop() {}
+```
+
+---
+
 # DNS Server Example
 
 ```cpp
@@ -320,6 +352,25 @@ NeuDnsServer dns;
 void setup()
 {
     dns.start();
+}
+```
+
+---
+
+# mDNS Example
+
+```cpp
+#define USE_NEU_MDNS
+#include <NeuWiFi.h>
+
+void setup()
+{
+    Serial.begin(115200);
+
+    NeuWiFi.begin();
+    NeuWiFi.startAP("NeuWiFi-Setup", "12345678");
+
+    NeuMDNS.addService("http", "tcp", 80);
 }
 ```
 
@@ -465,15 +516,44 @@ void setup()
 | `setBroadcast()`  | Enable broadcast mode    |
 | `joinMulticast()` | Join multicast group     |
 | `setCallback()`   | Register packet callback |
+| `reply()`         | Reply to last sender     |
 
 ---
 
 # NeuDnsServer API
 
-| Function  | Description     |
-| --------- | --------------- |
-| `start()` | Start DNS task  |
-| `stop()`  | Stop DNS server |
+| Function      | Description        |
+| ------------- | ------------------ |
+| `init()`      | Initialize DNS     |
+| `begin()`     | Alias for init()   |
+| `stop()`      | Stop DNS server    |
+| `start()`     | Start DNS task     |
+| `isRunning()` | Check status       |
+| `onQuery()`   | Set query callback |
+
+---
+
+# NeuMDNS API
+
+| Function / Method                                                  | Description                                                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `NeuMDNSClass()`                                                   | Constructor: Initialize mDNS handler instance                                        |
+| `init(hostname, instance_name)`                                    | Initialize mDNS stack, set device hostname and display name                          |
+| `begin(hostname, instance_name)`                                   | Alias for init() — start mDNS service                                                |
+| `end()`                                                            | Stop mDNS service and free resources                                                 |
+| `addService(service_name, proto, port, txt)`                       | Publish a new service to the network (e.g. \_http, \_udp) with optional TXT metadata |
+| `startDiscovery(service_name, proto, timeout_ms, interval_ms)`     | Start scanning the network for specified services                                    |
+| `stopDiscovery()`                                                  | Stop active discovery scan                                                           |
+| `setCallback(callback)`                                            | Register function to receive discovered device events                                |
+| `available()`                                                      | Check if any discovered device data is ready to be read                              |
+| `readIP()`                                                         | Get IP address of the first device in queue (raw 32-bit value)                       |
+| `readIP(out_config)`                                               | Write discovered IP info into IPConfig structure                                     |
+| `readIP(out_str)`                                                  | Write discovered IP as human-readable string                                         |
+| `readPort()`                                                       | Get port number of the first device in queue                                         |
+| `readDevice(out_hostname, max_len, out_ip_str, out_txt)`           | Read full device info: hostname, IP string, and TXT record                           |
+| `readDevice(out_hostname, max_len, out_ip_str, out_port, out_txt)` | Read full device info including port number                                          |
+| `readDevice(out_hostname, max_len, out_config, out_txt)`           | Read full device info into IPConfig structure                                        |
+| `readDevice(out_hostname, max_len, out_config, out_port, out_txt)` | Read full device info into IPConfig + port number                                    |
 
 ---
 
@@ -497,10 +577,10 @@ NeuWiFiConfig.h
 | `NEU_SERVER_WS_BUF_SIZE`   | 256     | Buffer size for incoming WebSocket frames.            |
 | `NEU_DNS_BUFFER_SIZE`      | 512     | UDP buffer size for DNS captive portal responses.     |
 
+> These values are optimized for ESP32 RAM stability and FreeRTOS stack safety.
+>
 > [!IMPORTANT]
 > Always define compile-time macros **before including `NeuWiFi.h`** to ensure correct module compilation and memory allocation.
->
-> These values are optimized for ESP32 RAM stability and FreeRTOS stack safety.
 
 ---
 
@@ -555,7 +635,7 @@ This helps reduce runtime instability and hidden fragmentation.
 
 NeuWiFi is designed as a **modular ESP32 networking stack**. You can include only what you need and enable features via compile-time flags.
 
-### 🔹 Basic Include (Recommended)
+### Basic Include (Recommended)
 
 ```cpp
 #include <NeuWiFi.h>
@@ -565,26 +645,27 @@ This single include gives access to all available modules. However, actual featu
 
 ---
 
-### 🔹 Optional Feature Flags (Compile-time)
+### Optional Feature Flags (Compile-time)
 
 Enable modules using `#define` or build flags:
 
-| Macro                  | Module                  | Description                   |
-| ---------------------- | ----------------------- | ----------------------------- |
-| `USE_HTTP_SERVER`      | HTTP Server + WebSocket | Lightweight HTTP + WS runtime |
-| `USE_WEBSOCKET_SERVER` | WebSocket only          | Standalone WS handler         |
-| `USE_WEBSOCKET`        | WebSocket alias         | Compatibility flag            |
-| `USE_HTTP_CLIENT`      | HTTP Client             | GET/POST + HTTPS support      |
+| Macro                 | Module                  | Description                                        |
+| --------------------- | ----------------------- | -------------------------------------------------- |
+| `USE_NEU_HTTP_SERVER` | HTTP Server + WebSocket | Lightweight web server + persistent connections    |
+| `USE_NEU_MDNS`        | mDNS Service Discovery  | Hostname resolution (name.local) + service scanner |
+| `USE_NEU_HTTP_CLIENT` | HTTP Client             | GET/POST + HTTPS support                           |
+| `USE_NEU_UDP`         | UDP Transport Core      | Enable NeuUDP asynchronous socket layer            |
+| `USE_NEU_DNS_SERVER`  | DNS Captive Portal      | Port 53 responder for automatic login portals      |
 
 ---
 
-### 🔹 PlatformIO Example
+### PlatformIO Example
 
 ```ini
 build_flags =
-    -D USE_HTTP_SERVER
-    -D USE_WEBSOCKET_SERVER
-    -D USE_HTTP_CLIENT
+    -D USE_NEU_HTTP_SERVER
+    -D USE_NEU_MDNS
+    -D USE_NEU_DNS_SERVER
 ```
 
 ---
@@ -592,9 +673,9 @@ build_flags =
 ### 🔹 Arduino / ESP-IDF Example
 
 ```cpp
-#define USE_HTTP_SERVER
-#define USE_HTTP_CLIENT
-#define USE_WEBSOCKET_SERVER
+#define USE_NEU_HTTP_SERVER
+#define USE_NEU_HTTP_CLIENT
+#define USE_NEU_MDNS
 
 #include <NeuWiFi.h>
 ```
@@ -614,8 +695,8 @@ build_flags =
 
 If no `USE_*` flags are defined:
 
-- Only `WiFi + UDP core` will be included
-- HTTP, WebSocket, and DNS modules will be excluded at compile-time
+- Only `WiFi` will be included
+- HTTP, WebSocket, UDP, mDNS and DNS modules will be excluded at compile-time
 
 This is intentional to keep memory footprint small for embedded systems.
 
