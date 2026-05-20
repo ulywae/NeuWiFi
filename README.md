@@ -16,7 +16,7 @@ Unlike generic libraries that simply wrap low-level APIs, NeuWiFi is built aroun
 
 # Features
 
-NeuWiFi packs a full suite of networking capabilities into one cohesive framework:
+NeuWiFi packs a full suite of networking capabilities into one cohesive framework
 
 ## Core WiFi Engine
 
